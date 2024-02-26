@@ -56,19 +56,19 @@ class ConstVelKalmanFilterNode : public ff::BaseMocapEstimator {
                 return;
             }
 			
-	    double vx = (pose_stamped.pose.x - prev_.state.pose.x) / dt;
-			double vy = (pose_stamped.pose.y - prev_.state.pose.y) / dt;
+	        double vx = (pose_stamped.pose.x - prev_.state.pose.x) / dt;
+	        double vy = (pose_stamped.pose.y - prev_.state.pose.y) / dt;
 			
 			// wrap angle delta to [-pi, pi]
-      		double dtheta = std::remainder(pose_stamped.pose.theta - prev_.state.pose.theta, 2 * M_PI);
-      		double wz = dtheta / dt;
+      	    double dtheta = std::remainder(pose_stamped.pose.theta - prev_.state.pose.theta, 2 * M_PI);
+      	    double wz = dtheta / dt;
 			
-			//estimated velocities for naive state estimation
-			Eigen::Vector3d vel(vx, vy, wz);
+	        //estimated velocities for naive state estimation
+	        Eigen::Vector3d vel(vx, vy, wz);
 
-			//get position vector from pose_stamped where vector is pose
-			//not sure if this is how to get the positions into an Eigen vector
-			Eigen::Vector3d pose = Eigen::Map<Eigen::Vector3d>(pose_stamped.pose, 3);
+	        //get position vector from pose_stamped where vector is pose
+	        //not sure if this is how to get the positions into an Eigen vector
+	        Eigen::Vector3d pose = Eigen::Map<Eigen::Vector3d>(pose_stamped.pose, 3);
 
 			//combine position vector and velocity vector for initial state vector
 			Eigen::Matrix<double, 6, 1> xvector  = Eigen::Matrix<double, 6, 1>::Zero(6, 1);
@@ -79,11 +79,11 @@ class ConstVelKalmanFilterNode : public ff::BaseMocapEstimator {
    			6 x 6 because of three states and three velocities for each of those states
 			P Format: 
    				1  0  0  0  0  0 
-       				0  1  0  0  0  0
+       			0  1  0  0  0  0
 				0  0  1  0  0  0
-    				0  0  0  1  0  0
+    			0  0  0  1  0  0
 				0  0  0  0  1  0
-    				0  0  0  0  0  1
+    			0  0  0  0  0  1
    			*/
 			Eigen::Matrix<double, 6, 6> P = Eigen::Matrix<double, 6, 6>::Identity(6, 6);
 		
@@ -108,10 +108,10 @@ class ConstVelKalmanFilterNode : public ff::BaseMocapEstimator {
 	    /*A matrix used for prediction of next state matrix -- just for factoring in naive estimation into the 
      		next position state matrix
 	    	Format:{ 
-      			{ 1 0 0 d 0 0}
+      		{ 1 0 0 d 0 0}
 	 		{ 0 1 0 0 d 0}
-    			{ 0 0 1 0 0 d}
-       			{ 0 0 0 1 0 0}
+    		{ 0 0 1 0 0 d}
+       		{ 0 0 0 1 0 0}
 			{ 0 0 0 0 1 0}
    			{ 0 0 0 0 0 1}
      			}
@@ -130,7 +130,7 @@ class ConstVelKalmanFilterNode : public ff::BaseMocapEstimator {
 	    /*H matrix 
 	    	Format:{ 
       			{ 1 0 0 0 0 0}
-	 		{ 0 1 0 0 0 0}
+	 		    { 0 1 0 0 0 0}
     			{ 0 0 1 0 0 0}
      			}
 			where d = dt 
@@ -140,16 +140,16 @@ class ConstVelKalmanFilterNode : public ff::BaseMocapEstimator {
 	    /* S is divisor for Kalman Gain separated to be able to use inverse function
      	       H    *    P    *  H.inv     +    R
 	    [3 x 6] * [6 x 6] * [6 x 3]  + [3 x 3]
-     	         [3 x 6] * [6 x 3]       + [3 x 3]
+     	     [3 x 6] * [6 x 3]       + [3 x 3]
 	       	      [3 x 3]      +       [3 x 3]
 	    S = 	        [3 x 3]
      		*/
             Eigen::Matrix3d S = (H * P) * H.transpose() + R;
 	    /* K is kalman gain 
 	       K =   H     *     P     *   H.inv   /     S    
-		  [3 x 6]  *  [6 x 6]  *  [6 * 3]  /  [3 x 3]
+		      [3 x 6]  *  [6 x 6]  *  [6 * 3]  /  [3 x 3]
  	                [3 x 6]  *  [6 x 3]        /  [3 x 3]
-		              [3 x 3]              /  [3 x 3]
+		                  [3 x 3]              /  [3 x 3]
 	       K =                       [3 x 3]
  		*/
             Eigen::Matrix3d K = P * H.transpose() * S.inverse();
