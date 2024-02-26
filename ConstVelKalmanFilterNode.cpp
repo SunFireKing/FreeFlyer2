@@ -16,6 +16,13 @@ using namespace std;
 class ConstVelKalmanFilterNode : public ff::BaseMocapEstimator {
 
     public:
+	
+
+        ConstVelKalmanFilterNode() : ff::BaseMocapEstimator("const_vel_kalman_filter_node") {
+            this->declare_parameter("min_dt", 0.005);
+        }
+
+        void EstimatewithPose2D(const Pose2DStamped & pose_stamped) override {
 	//6 x 6 accounts for velocity, so even though we aren't fed in velocity we can calculate it and already have a variance for it
         Eigen::Matrix<double, 6, 6> Q << 1e-5, 0, 0, 0, 0, 0,  //Process Noise Covariance Matrix
 					 0, 1e-5, 0, 0, 0, 0,
@@ -31,12 +38,6 @@ class ConstVelKalmanFilterNode : public ff::BaseMocapEstimator {
 	        0.0   , 1.2527e-3,   0.0    ,
 	        0.0   ,   0.0    , 4.0482e-3;
         //double MAX_DT = 1e-3;
-
-        ConstVelKalmanFilterNode() : ff::BaseMocapEstimator("const_vel_kalman_filter_node") {
-            this->declare_parameter("min_dt", 0.005);
-        }
-
-        void EstimatewithPose2D(const Pose2DStamped & pose_stamped) override {
 
          //R = Eigen::Matrix<3,3>::Identity(3, 3) * 2.4445e-3, 1.2527e-3, 4.0482e-3;
         
