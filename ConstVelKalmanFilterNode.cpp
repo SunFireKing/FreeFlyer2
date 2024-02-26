@@ -161,11 +161,13 @@ class ConstVelKalmanFilterNode : public ff::BaseMocapEstimator {
 			
   		*/
             x = x + K * (y;
-		/* P = ([3 x 6] - [3 x 3] * [3 x 6]) * [6 x 6]
-			     [3 x 6] * [6 x 6]
-		   P =            [3 x 6]
+		/* P = ([6 x 6] - [6 x 6] * [6 x 6]) * [6 x 6]
+			     [6 x 6] * [6 x 6]
+		   P =            [6 x 6]
 		*/
-            P =  K * H * P;
+	//I is identity matrix <6 , 6> because of how commonly used it is
+	    Eigen::Matrix<double, 6, 6> I = Eigen::Matrix<double, 6, 6>::Identity(6, 6);
+            P = (I - K * H) * P;
         }
 
         double wrap_angle(double theta) {
