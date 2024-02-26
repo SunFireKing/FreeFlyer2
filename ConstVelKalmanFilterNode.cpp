@@ -34,9 +34,12 @@ class ConstVelKalmanFilterNode : public ff::BaseMocapEstimator {
 
 	// R is Measurement Covariance Matrix. Can be thought of as observation error
         Eigen::Matrix<double, 3, 3> R;
-	R << 2.4445e-3,   0.0    ,   0.0    ,
-	        0.0   , 1.2527e-3,   0.0    ,
-	        0.0   ,   0.0    , 4.0482e-3;
+	R << 2.4445e-3,   0.0    ,   0.0    ,   0.0   ,   0.0    ,   0.0    ,  
+	        0.0   , 1.2527e-3,   0.0    ,   0.0   ,   0.0    ,   0.0    ,
+	        0.0   ,   0.0    , 4.0482e-3,   0.0   ,   0.0    ,   0.0    ,
+		0.0   ,   0.0    ,   0.0    ,   0.0   ,   0.0    ,   0.0    ,
+		0.0   ,   0.0    ,   0.0    ,   0.0   ,   0.0    ,   0.0    ,
+		0.0   ,   0.0    ,   0.0    ,   0.0   ,   0.0    ,   0.0    ;
         //double MAX_DT = 1e-3;
 
          //R = Eigen::Matrix<3,3>::Identity(3, 3) * 2.4445e-3, 1.2527e-3, 4.0482e-3;
@@ -56,8 +59,8 @@ class ConstVelKalmanFilterNode : public ff::BaseMocapEstimator {
                 return;
             }
 			
-	        double vx = (pose_stamped.pose.x - prev_.state.pose.x) / dt;
-	        double vy = (pose_stamped.pose.y - prev_.state.pose.y) / dt;
+	    double vx = (pose_stamped.pose.x - prev_.state.pose.x) / dt;
+	    double vy = (pose_stamped.pose.y - prev_.state.pose.y) / dt;
 			
 			// wrap angle delta to [-pi, pi]
       	    double dtheta = std::remainder(pose_stamped.pose.theta - prev_.state.pose.theta, 2 * M_PI);
@@ -71,19 +74,19 @@ class ConstVelKalmanFilterNode : public ff::BaseMocapEstimator {
 	        Eigen::Vector3d pose = Eigen::Map<Eigen::Vector3d>(pose_stamped.pose, 3);
 
 			//combine position vector and velocity vector for initial state vector
-			Eigen::Matrix<double, 6, 1> xvector  = Eigen::Matrix<double, 6, 1>::Zero(6, 1);
-			xvector.block<3, 1>(0,0) = vel;
-			xvector.block<3, 1>(3,0) = pose;
+			Eigen::Matrix<double, 6, 1> x  = Eigen::Matrix<double, 6, 1>::Zero(6, 1);
+			x.block<3, 1>(0,0) = vel;
+			x.block<3, 1>(3,0) = pose;
 
 			/*Find out state variance-covariance matrix = P-- using identity matrix for now
    			6 x 6 because of three states and three velocities for each of those states
 			P Format: 
    				1  0  0  0  0  0 
-       			0  1  0  0  0  0
+       				0  1  0  0  0  0
 				0  0  1  0  0  0
-    			0  0  0  1  0  0
+    				0  0  0  1  0  0
 				0  0  0  0  1  0
-    			0  0  0  0  0  1
+    				0  0  0  0  0  1
    			*/
 			Eigen::Matrix<double, 6, 6> P = Eigen::Matrix<double, 6, 6>::Identity(6, 6);
 		
@@ -109,20 +112,20 @@ class ConstVelKalmanFilterNode : public ff::BaseMocapEstimator {
      		next position state matrix
 	    	Format:{ 
       		{ 1 0 0 d 0 0}
-	 		{ 0 1 0 0 d 0}
+	 	{ 0 1 0 0 d 0}
     		{ 0 0 1 0 0 d}
        		{ 0 0 0 1 0 0}
-			{ 0 0 0 0 1 0}
-   			{ 0 0 0 0 0 1}
+		{ 0 0 0 0 1 0}
+   		{ 0 0 0 0 0 1}
      			}
 			where d = dt 
      		*/
             Eigen::Matrix<double, 6, 6> A = Eigen::Matrix<double, 6, 6>::Identity(6, 6);
             A.block<3, 3>(0, 3).setIdentity() * dt;
 
-			//[6 x 6] * [6 x 1] = [6 x 1]
-            x = A * xvector;
-			//
+	//[6 x 6] * [6 x 1] = [6 x 1]
+            x = A * x;
+	//  P = [6 x 6] * [6 x 6] * [6 x 6] + [6 x 6]
             P = A * P * A.transpose() + Q * dt;
         }
 
@@ -130,7 +133,7 @@ class ConstVelKalmanFilterNode : public ff::BaseMocapEstimator {
 	    /*H matrix 
 	    	Format:{ 
       			{ 1 0 0 0 0 0}
-	 		    { 0 1 0 0 0 0}
+	 		{ 0 1 0 0 0 0}
     			{ 0 0 1 0 0 0}
      			}
 			where d = dt 
@@ -139,25 +142,30 @@ class ConstVelKalmanFilterNode : public ff::BaseMocapEstimator {
             H.block<3, 3>(0, 0).setIdentity();
 	    /* S is divisor for Kalman Gain separated to be able to use inverse function
      	       H    *    P    *  H.inv     +    R
-	    [3 x 6] * [6 x 6] * [6 x 3]  + [3 x 3]
-     	     [3 x 6] * [6 x 3]       + [3 x 3]
-	       	      [3 x 3]      +       [3 x 3]
-	    S = 	        [3 x 3]
+	    [6 x 6] * [6 x 6] * [6 x 6]  + [6 x 6]
+     	         [6 x 6] * [6 x 6]       + [6 x 6]
+	       	      [6 x 6]      +       [6 x 6]
+	    S = 	        [6 x 6]
      		*/
             Eigen::Matrix3d S = (H * P) * H.transpose() + R;
 	    /* K is kalman gain 
-	       K =   H     *     P     *   H.inv   /     S    
-		      [3 x 6]  *  [6 x 6]  *  [6 * 3]  /  [3 x 3]
- 	                [3 x 6]  *  [6 x 3]        /  [3 x 3]
-		                  [3 x 3]              /  [3 x 3]
-	       K =                       [3 x 3]
+	       K =   P     *   H.inv   /     S    
+		  [6 x 6]  *  [6 x 6]  /  [6 x 6]
+ 	                [6 x 6]        /  [6 x 6]
+	       K =              [6 x 6]
  		*/
             Eigen::Matrix3d K = P * H.transpose() * S.inverse();
-            Eigen::VectorXd y = z - H * x;
+            Eigen::Matrix<double, 6, 1> y = z - H * x;
             y(2) = wrap_angle(y(2));
-
-            x += K * y;
-            P -= K * H * P;
+		/* x = [6 x 1] + [6 x 6] * ([6 x 1] - [6 x 6] * [6 x 1])
+			
+  		*/
+            x = x + K * (y;
+		/* P = ([3 x 6] - [3 x 3] * [3 x 6]) * [6 x 6]
+			     [3 x 6] * [6 x 6]
+		   P =            [3 x 6]
+		*/
+            P =  K * H * P;
         }
 
         double wrap_angle(double theta) {
