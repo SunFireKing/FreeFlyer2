@@ -39,12 +39,12 @@ class ConstVelKalmanFilterNode : public ff::BaseMocapEstimator {
 					0.0   ,   0.0    ,   0.0    ,   0.0   ,   0.0    ,   0.0    
 		    ).finished();
 		
-		flag
+		flag = 0;
         }
 
         void EstimatewithPose2D(const Pose2DStamped & pose_stamped) override {
 
-
+	if 
          //R = Eigen::Matrix<3,3>::Identity(3, 3) * 2.4445e-3, 1.2527e-3, 4.0482e-3;
         
         FreeFlyerState state{};
@@ -127,28 +127,32 @@ class ConstVelKalmanFilterNode : public ff::BaseMocapEstimator {
 	 		{ 0 1 0 0 0 0}
     			{ 0 0 1 0 0 0}
      			}
-			where d = dt 
      		*/
-            Eigen::Matrix<double, 6, 6> H = Eigen::Matrix<double, 3, 6>::Zero(3, 6);
+            Eigen::Matrix<double, 3, 6> H = Eigen::Matrix<double, 3, 6>::Zero(3, 6);
             H.block<3, 3>(0, 0).setIdentity();
 	    /* S is divisor for Kalman Gain separated to be able to use inverse function
      	       H    *    P    *  H.inv     +    R
-	    [6 x 6] * [6 x 6] * [6 x 6]  + [6 x 6]
-     	         [6 x 6] * [6 x 6]       + [6 x 6]
-	       	      [6 x 6]      +       [6 x 6]
+	    [3 x 6] * [6 x 6] * [6 x 3]  + [3 x 3]
+     	         [3 x 6] * [6 x 3]       + [3 x 3]
+	       	      [3 x 3]      +       [3 x 3]
 	    S = 	        [6 x 6]
      		*/
             Eigen::Matrix3d S = (H * P) * H.transpose() + R;
 	    /* K is kalman gain 
 	       K =   P     *   H.inv   /     S    
-		  [6 x 6]  *  [6 x 6]  /  [6 x 6]
- 	                [6 x 6]        /  [6 x 6]
-	       K =              [6 x 6]
+		  [6 x 6]  *  [6 x 3]  /  [3 x 3]
+ 	                [6 x 3]        /  [3 x 3]
+	       K =              [6 x 3]
  		*/
             Eigen::Matrix3d K = P * H.transpose() * S.inverse();
+		/* y = [3 x 1] - [3 x 6] * [6 x 1]
+  			[3 x 1] - [3 x 1]
+		
             Eigen::Matrix<double, 6, 1> y = z - H * x;
             y(2) = wrap_angle(y(2));
-		/* x = [6 x 1] + [6 x 6] * ([6 x 1] - [6 x 6] * [6 x 1])
+		/* x = [6 x 1] + [6 x 3] * ([3 x 1] - [3 x 6] * [6 x 1])
+  			[6 x 1] + [6 x 3] *([3 x 1])
+     			[6 x 1] + [6 x 1]
 			will this work with y being zero and x being same value as on the 
   		*/
             x = x + K * (y - H * x);
