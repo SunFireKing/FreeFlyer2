@@ -21,7 +21,6 @@ class ConstVelKalmanFilterNode : public ff::BaseMocapEstimator {
 	
         ConstVelKalmanFilterNode() : ff::BaseMocapEstimator("const_vel_kalman_filter_node") {
             this->declare_parameter("min_dt", 0.005);
-		x
 		P.setIdentity();
 		Q =  (Qmatrix() << 1e-5, 0, 0, 0, 0, 0,  //Process Noise Covariance Matrix
 				  0, 1e-5, 0, 0, 0, 0,
@@ -44,15 +43,25 @@ class ConstVelKalmanFilterNode : public ff::BaseMocapEstimator {
 
         void EstimatewithPose2D(const Pose2DStamped & pose_stamped) override {
 
-	if 
+	FreeFlyerState state{};
+	//initial declaration cycle
+	if (flag == 0) {
+		
+		Eigen::Vector3d pose = Eigen::Map<Eigen::Vector3d>(pose_stamped.pose, 3);
+		x.block<3, 1>(0,0) = pose;
+		flag++;
+	} else {
+		
+		
+	}
          //R = Eigen::Matrix<3,3>::Identity(3, 3) * 2.4445e-3, 1.2527e-3, 4.0482e-3;
         
-        FreeFlyerState state{};
+        
 
 	state.pose = pose_stamped.pose;
 	/* In order to use new state prediction, velocity must be discovered, and because there is constant vel
  	   We can do (current state  - previous state)/ change in time
-     	*/
+     	
         if (prev_state_ready_) {
             const rclcpp::Time now = pose_stamped.header.stamp;
             const rclcpp::Time last = prev_.header.stamp;
@@ -90,7 +99,7 @@ class ConstVelKalmanFilterNode : public ff::BaseMocapEstimator {
 
         prev_.state = state;
         prev_.header = pose_stamped.header;
-
+	*/
         SendStateEstimate(state);
     }
 
@@ -135,7 +144,7 @@ class ConstVelKalmanFilterNode : public ff::BaseMocapEstimator {
 	    [3 x 6] * [6 x 6] * [6 x 3]  + [3 x 3]
      	         [3 x 6] * [6 x 3]       + [3 x 3]
 	       	      [3 x 3]      +       [3 x 3]
-	    S = 	        [6 x 6]
+	    S = 	        [3 x 3]
      		*/
             Eigen::Matrix3d S = (H * P) * H.transpose() + R;
 	    /* K is kalman gain 
@@ -150,19 +159,23 @@ class ConstVelKalmanFilterNode : public ff::BaseMocapEstimator {
 		
             Eigen::Matrix<double, 6, 1> y = z - H * x;
             y(2) = wrap_angle(y(2));
-		/* x = [6 x 1] + [6 x 3] * ([3 x 1] - [3 x 6] * [6 x 1])
+		/* x = [6 x 1] + [6 x 3] * ([3 x 1])
   			[6 x 1] + [6 x 3] *([3 x 1])
      			[6 x 1] + [6 x 1]
-			will this work with y being zero and x being same value as on the 
   		*/
-            x = x + K * (y - H * x);
+	    //New State x
+            x = x + K * y;
+		
 		/* P = ([6 x 6] - [6 x 6] * [6 x 6]) * [6 x 6]
 			     [6 x 6] * [6 x 6]
 		   P =            [6 x 6]
 		*/
-	//I is identity matrix <6 , 6> because of how commonly used it is
-	  //  Eigen::Matrix<double, 6, 6> I = Eigen::Matrix<double, 6, 6>::Identity(6, 6);
-            P = (H - K * H) * P;
+	//I is identity matrix <6 , 6> 
+	Eigen::Matrix<double, 6, 6> I = Eigen::Matrix<double, 6, 6>::Identity(6, 6);
+	/*
+ 		P = [(6 x 6) - (6 x 3) * (3 x 6)] * (6 x 6)
+  	*/
+            P = (I - K * H) * P;
         }
 
         double wrap_angle(double theta) {
