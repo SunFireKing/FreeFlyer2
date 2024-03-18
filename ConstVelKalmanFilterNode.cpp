@@ -51,14 +51,24 @@ class ConstVelKalmanFilterNode : public ff::BaseMocapEstimator {
 		x.block<3, 1>(0,0) = pose;
 		flag++;
 	} else {
-		
+		Eigen::Vector3d pose = Eigen::Map<Eigen::Vector3d>(pose_stamped.pose, 3);
+		prev_.header = pose_stamped.header;
+		const rclcpp::Time now = pose_stamped.header.stamp;
+            	const rclcpp::Time last = prev_.header.stamp;
+           	double dt = (now - last).seconds();
+		process_update(dt);
+		measurement_update(pose);
+		state.pose.x = x.block<1, 1>(0,0);
+		state.pose.y = x.block<1, 1>(1,0);
+		state.pose.theta = x.block<1, 1>(2,0);
+		SendStateEstimate(state);
 		
 	}
          //R = Eigen::Matrix<3,3>::Identity(3, 3) * 2.4445e-3, 1.2527e-3, 4.0482e-3;
         
         
 
-	state.pose = pose_stamped.pose;
+	
 	/* In order to use new state prediction, velocity must be discovered, and because there is constant vel
  	   We can do (current state  - previous state)/ change in time
      	
@@ -100,7 +110,7 @@ class ConstVelKalmanFilterNode : public ff::BaseMocapEstimator {
         prev_.state = state;
         prev_.header = pose_stamped.header;
 	*/
-        SendStateEstimate(state);
+        //SendStateEstimate(state);
     }
 
 
@@ -156,9 +166,9 @@ class ConstVelKalmanFilterNode : public ff::BaseMocapEstimator {
             Eigen::Matrix3d K = P * H.transpose() * S.inverse();
 		/* y = [3 x 1] - [3 x 6] * [6 x 1]
   			[3 x 1] - [3 x 1]
-		
+	    z.block<1,1>(1,0) = wrap_angle(z.block<1,1>(1,0));
             Eigen::Matrix<double, 6, 1> y = z - H * x;
-            y(2) = wrap_angle(y(2));
+            y.block<1,1>(1,0) = wrap_angle(y.block<1,1>(1,0));
 		/* x = [6 x 1] + [6 x 3] * ([3 x 1])
   			[6 x 1] + [6 x 3] *([3 x 1])
      			[6 x 1] + [6 x 1]
