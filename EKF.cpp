@@ -3,7 +3,7 @@
 #include "Eigen/Dense"
 #include <iostream>
 
-// Refer to: shazraz/Extended-Kalman-Filter
+
 using namespace std;
 using Eigen::MatrixXd;
 using Eigen::VectorXd;
@@ -347,6 +347,8 @@ void FusionEKF::ProcessMeasurement(const MeasurementPackage &measurement_pack) {
     ekf_.R_ = R_laser_;
     ekf_.Update(measurement_pack.raw_measurements_); //Comment this line to turn off LIDAR updates   
   }
+
+	// Refer to: shazraz/Extended-Kalman-Filter
 
   // print the output
   cout << "x_ = " << ekf_.x_ << endl;
